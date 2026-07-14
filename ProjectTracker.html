@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Project Tracker</title>
+<style>
+  :root {
+    --ink: #1a1a2e;
+    --muted: #667;
+    --line: #d5d5dd;
+    --paper: #fff;
+    --wash: #f4f4f8;
+    --accent: #1f4e79;
+    --good: #2a7a2a;
+    --bad: #b03030;
+    --warn-bg: #fdeeee;
+    --good-bg: #eaf7ea;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, sans-serif; margin: 0; color: var(--ink); background: var(--wash); line-height: 1.45; }
+  header { background: var(--paper); border-bottom: 2px solid var(--line); padding: 0.75rem 1.25rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
+  header h1 { font-size: 1.25rem; margin: 0 auto 0 0; }
+  .save-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; }
+  .save-bar label { font-size: 0.9rem; color: var(--muted); }
+  #initials { width: 4.5rem; font-size: 1rem; padding: 0.35rem; text-transform: uppercase; }
+  button { font-size: 0.95rem; padding: 0.45rem 0.9rem; cursor: pointer; border: 1px solid var(--line); border-radius: 4px; background: var(--paper); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.subtle { border: none; background: none; color: var(--accent); text-decoration: underline; padding: 0.2rem; }
+  button.danger-link { border: none; background: none; color: var(--bad); text-decoration: underline; padding: 0.2rem; font-size: 0.85rem; }
+  .status-line { font-size: 0.85rem; color: var(--muted); width: 100%; text-align: right; }
+  #dirty { color: var(--bad); font-weight: bold; display: none; }
+  #message { margin: 0.75rem 1.25rem; padding: 0.7rem; border: 2px solid var(--line); background: var(--paper); white-space: pre-wrap; display: none; border-radius: 4px; }
+  #message.good { border-color: var(--good); background: var(--good-bg); display: block; }
+  #message.bad { border-color: var(--bad); background: var(--warn-bg); display: block; }
+  #message.plain { display: block; }
+  main { max-width: 62rem; margin: 1rem auto 3rem; padding: 0 1.25rem; }
+  section.card { background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 1rem 1.25rem; margin-bottom: 1.25rem; }
+  section.card h2 { font-size: 1.05rem; margin: 0 0 0.6rem; }
+  .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; margin-bottom: 0.75rem; font-size: 0.92rem; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+  tr.project-row { cursor: pointer; }
+  tr.project-row:hover { background: var(--wash); }
+  .badge { display: inline-block; font-size: 0.78rem; padding: 0.12rem 0.5rem; border-radius: 999px; white-space: nowrap; }
+  .badge.status-active { background: #e2efe2; color: #1e5c1e; }
+  .badge.status-awaiting-client { background: #fdf3d7; color: #7a5a00; }
+  .badge.status-on-hold { background: #e8e8ee; color: #555; }
+  .badge.status-closed { background: #eee; color: #888; }
+  .overdue { color: var(--bad); font-weight: bold; }
+  .soon-list { margin: 0; padding: 0; list-style: none; }
+  .soon-list li { padding: 0.3rem 0; border-bottom: 1px dashed var(--line); }
+  .soon-list li:last-child { border-bottom: none; }
+  .soon-when { display: inline-block; min-width: 9.5rem; }
+  .muted { color: var(--muted); }
+  .empty { color: var(--muted); font-style: italic; }
+  .field { margin-bottom: 0.75rem; }
+  .field label { display: block; font-size: 0.82rem; color: var(--muted); margin-bottom: 0.15rem; }
+  .field input[type="text"], .field textarea, .field select { width: 100%; font-size: 1rem; padding: 0.4rem; border: 1px solid var(--line); border-radius: 4px; font-family: inherit; }
+  .field textarea { min-height: 5rem; }
+  .field-row { display: flex; gap: 1rem; flex-wrap: wrap; }
+  .field-row .field { flex: 1; min-width: 12rem; }
+  .item-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem 0; flex-wrap: wrap; }
+  .item-row input[type="text"] { flex: 1; min-width: 10rem; font-size: 0.95rem; padding: 0.35rem; border: 1px solid var(--line); border-radius: 4px; }
+  .item-row input[type="date"] { font-size: 0.9rem; padding: 0.3rem; border: 1px solid var(--line); border-radius: 4px; }
+  .item-row input.assignee { flex: 0 0 5rem; min-width: 5rem; text-transform: uppercase; }
+  .item-row .remove { border: none; background: none; color: var(--muted); cursor: pointer; font-size: 1rem; padding: 0.1rem 0.4rem; }
+  .item-row .remove:hover { color: var(--bad); }
+  .item-row.done input[type="text"] { text-decoration: line-through; color: var(--muted); }
+  .note { border-top: 1px solid var(--line); padding: 0.5rem 0; }
+  .note-head { font-size: 0.82rem; color: var(--muted); display: flex; justify-content: space-between; }
+  .note-body { white-space: pre-wrap; margin-top: 0.15rem; }
+  .note-composer textarea { width: 100%; min-height: 3.5rem; font-size: 0.95rem; padding: 0.4rem; border: 1px solid var(--line); border-radius: 4px; font-family: inherit; }
+  .back { margin-bottom: 0.75rem; }
+  details.help { max-width: 62rem; margin: 0 auto 2rem; padding: 0 1.25rem; font-size: 0.9rem; color: var(--muted); }
+  details.help li { margin: 0.25rem 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Project Tracker</h1>
+  <div class="save-bar">
+    <label for="initials">Your initials:</label>
+    <input id="initials" type="text" maxlength="4" placeholder="e.g. NC" autocomplete="off">
+    <button id="btn-connect" type="button">Connect to this file</button>
+    <button id="btn-save" type="button" class="primary">Save</button>
+  </div>
+  <div class="status-line">
+    <span id="dirty">Unsaved changes</span>
+    <span id="last-saved"></span>
+  </div>
+</header>
+
+<div id="message"></div>
+
+<main id="app"></main>
+
+<details class="help">
+  <summary>How to use / trouble saving?</summary>
+  <ol>
+    <li>In NetDocuments, use <strong>Check Out &amp; Download</strong> on this file (don't just click it open — changes made that way are lost).</li>
+    <li>Open the downloaded file in your browser (it's usually in your Downloads folder).</li>
+    <li>Click <strong>“Connect to this file”</strong> once and pick this same file in the window that opens.</li>
+    <li>Make your changes, then click <strong>Save</strong>.</li>
+    <li>When you're done, <strong>check the file back in</strong> to NetDocuments (pick the saved file from your Downloads folder).</li>
+  </ol>
+  <p>If Save doesn't work on this computer, use this instead:
+    <button id="btn-save-copy" type="button">Save a copy (fallback)</button><br>
+    It downloads an up-to-date copy of this file — that downloaded copy is then the current one, so check <em>it</em> in to NetDocuments.</p>
+</details>
+
+<!-- ================= DATA ISLAND =================
+     All persisted state lives in this inert JSON block. Saving works by
+     string-replacing this block's contents inside the file's own source
+     text and writing the whole file back. -->
+<script type="application/json" id="tracker-data">
+{
+  "schemaVersion": 1,
+  "meta": {
+    "lastSaved": null,
+    "savedBy": null
+  },
+  "projects": []
+}
+</script>
+
+<script>
+"use strict";
+
+/* =====================================================================
+   PERSISTENCE LAYER (validated by the Phase 0 spike)
+   ===================================================================== */
+
+// Matches the data island in the file's SOURCE TEXT. This regex's own
+// source spells "application\/json" (with a backslash), so it can never
+// match itself; the island's opening tag must appear exactly once in the
+// file (see buildFileText, which builds that tag by concatenation to keep
+// it out of this script's source).
+var ISLAND_RE = /<script type="application\/json" id="tracker-data">[\s\S]*?<\/script>/;
+
+// JSON with every "/" escaped as "\/". "\/" is valid JSON that parses
+// back to "/", and it guarantees the payload contains no "</" — otherwise
+// user text containing a close-script tag would terminate the data island
+// when the browser parses the saved file, corrupting it.
+function serializeState(state) {
+  return JSON.stringify(state, null, 2).replace(/\//g, "\\/");
+}
+
+function readIsland() {
+  return JSON.parse(document.getElementById("tracker-data").textContent);
+}
+
+function buildFileText(sourceText, state) {
+  if (!ISLAND_RE.test(sourceText)) {
+    throw new Error("data island not found in source text");
+  }
+  // Tag strings split so they never appear literally in this file's
+  // source: the opening tag would be a false second match for ISLAND_RE,
+  // and a literal close-script tag (even inside a comment or string)
+  // terminates this script block during HTML parsing.
+  var islandOpen = "<scr" + 'ipt type="application/json" id="tracker-data">';
+  var islandClose = "</scr" + "ipt>";
+  var replacement = islandOpen + "\n" + serializeState(state) + "\n" + islandClose;
+  // Replacer FUNCTION so "$&"-style sequences in user text are literal.
+  return sourceText.replace(ISLAND_RE, function () { return replacement; });
+}
+
+// Fallback base when the fallback saver runs without a pristine source
+// (File System Access API unavailable, so Connect never ran). DOM
+// serialization risks browser normalization; acceptable for a downloaded
+// copy, never used for the in-place path.
+function currentDomSource() {
+  return "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
+}
+
+function escapingSelfTest() {
+  try {
+    var evil = "</scr" + "ipt><script>bad()<" + "/script> and <" + "/ too";
+    var out = serializeState({ note: evil });
+    return out.indexOf("</") === -1 && JSON.parse(out).note === evil;
+  } catch (e) {
+    return false;
+  }
+}
+
+/* =====================================================================
+   APP STATE & HELPERS
+   ===================================================================== */
+
+var state;                  // parsed data-island contents (the document)
+var dirty = false;
+var fileHandle = null;      // FileSystemFileHandle after "Connect"
+var pristineSource = null;  // file source text read at connect time
+var connectedName = null;
+
+// Session-only UI state. Never persisted, never in localStorage (data
+// must travel with the file; localStorage is machine-local).
+var session = {
+  initials: "",
+  view: { name: "dashboard" },
+  sort: "deadline",
+  showClosed: false
+};
+
+var STATUSES = [
+  { value: "active", label: "Active" },
+  { value: "awaiting-client", label: "Awaiting Client" },
+  { value: "on-hold", label: "On Hold" },
+  { value: "closed", label: "Closed" }
+];
+var STATUS_ORDER = { "active": 0, "awaiting-client": 1, "on-hold": 2, "closed": 3 };
+var DUE_SOON_DAYS = 14;
+
+function statusLabel(v) {
+  for (var i = 0; i < STATUSES.length; i++) if (STATUSES[i].value === v) return STATUSES[i].label;
+  return v;
+}
+
+function uuid() {
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  return "id-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
+}
+
+// Dates are stored as "YYYY-MM-DD" and compared as strings (safe for that
+// format). Never fed to new Date(str) directly — that parses as UTC and
+// shifts the day in western timezones.
+function localToday() {
+  var d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+function formatDate(ymd) {
+  if (!ymd) return "";
+  var p = ymd.split("-");
+  var d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+function daysFromToday(ymd) {
+  var p = ymd.split("-");
+  var target = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+  var t = localToday().split("-");
+  var today = new Date(Number(t[0]), Number(t[1]) - 1, Number(t[2]));
+  return Math.round((target - today) / 86400000);
+}
+function whenPhrase(ymd) {
+  var n = daysFromToday(ymd);
+  if (n < 0) return (-n) + (n === -1 ? " day" : " days") + " overdue";
+  if (n === 0) return "today";
+  if (n === 1) return "tomorrow";
+  return "in " + n + " days";
+}
+
+function getProject(id) {
+  for (var i = 0; i < state.projects.length; i++) if (state.projects[i].id === id) return state.projects[i];
+  return null;
+}
+
+// Earliest upcoming deadline, plus whether anything is overdue.
+function deadlineSummary(p) {
+  var today = localToday();
+  var upcoming = null, overdue = null;
+  (p.deadlines || []).forEach(function (d) {
+    if (!d.date) return;
+    if (d.date < today) { if (!overdue || d.date < overdue.date) overdue = d; }
+    else { if (!upcoming || d.date < upcoming.date) upcoming = d; }
+  });
+  return { upcoming: upcoming, overdue: overdue };
+}
+
+/* =====================================================================
+   SAVE SYSTEM
+   ===================================================================== */
+
+var messageEl = document.getElementById("message");
+
+function showMessage(text, kind) {
+  messageEl.textContent = text;
+  messageEl.className = kind || "plain";
+}
+function clearMessage() {
+  messageEl.textContent = "";
+  messageEl.className = "";
+}
+
+function markDirty() {
+  dirty = true;
+  updateSaveBar();
+}
+
+function updateSaveBar() {
+  document.getElementById("dirty").style.display = dirty ? "inline" : "none";
+  var last = document.getElementById("last-saved");
+  if (state.meta && state.meta.lastSaved) {
+    var when = new Date(state.meta.lastSaved);
+    last.textContent = "Last saved: " + when.toLocaleString() + (state.meta.savedBy ? " by " + state.meta.savedBy : "");
+  } else {
+    last.textContent = "Never saved yet";
+  }
+  var btn = document.getElementById("btn-connect");
+  if (fileHandle) {
+    btn.textContent = "Connected ✓ (" + connectedName + ")";
+  } else {
+    btn.textContent = "Connect to this file";
+  }
+}
+
+function requireInitials() {
+  var v = session.initials.trim().toUpperCase();
+  if (!v) {
+    showMessage("Please type your initials in the box at the top first — they go on the save record and your notes.", "bad");
+    document.getElementById("initials").focus();
+    return null;
+  }
+  return v;
+}
+
+async function onConnect() {
+  clearMessage();
+  if (!window.showOpenFilePicker) {
+    showMessage(
+      "This browser can't save the file in place. Open “How to use / trouble saving?” at the bottom and use the “Save a copy (fallback)” button instead.",
+      "bad"
+    );
+    return;
+  }
+  var picked;
+  try {
+    picked = await window.showOpenFilePicker({
+      types: [{ description: "HTML file", accept: { "text/html": [".html", ".htm"] } }]
+    });
+  } catch (e) {
+    if (e && e.name === "AbortError") {
+      showMessage("No file was chosen. Click “Connect to this file” and pick this file (ProjectTracker.html) to continue.");
+    } else {
+      showMessage("The file picker didn't open (" + e.name + ": " + e.message + "). Use the “Save a copy (fallback)” button at the bottom instead.", "bad");
+    }
+    return;
+  }
+  try {
+    var handle = picked[0];
+    var file = await handle.getFile();
+    var text = await file.text();
+    if (!ISLAND_RE.test(text)) {
+      showMessage(
+        "The file you picked (“" + file.name + "”) doesn't look like this tracker file. Click “Connect to this file” again and choose the same file you have open in this browser.",
+        "bad"
+      );
+      return;
+    }
+    fileHandle = handle;
+    pristineSource = text;
+    connectedName = file.name;
+    showMessage("Connected to “" + file.name + "”. Save will now work for the rest of this session.", "good");
+  } catch (e) {
+    showMessage("Could not read the chosen file (" + e.name + ": " + e.message + "). Use the “Save a copy (fallback)” button at the bottom instead.", "bad");
+  }
+  updateSaveBar();
+}
+
+async function onSave() {
+  clearMessage();
+  if (!fileHandle || !pristineSource) {
+    showMessage("Not connected yet. Click “Connect to this file” first, pick this file in the window that opens, then click Save again.", "bad");
+    return;
+  }
+  var initials = requireInitials();
+  if (!initials) return;
+  try {
+    if (fileHandle.queryPermission) {
+      var perm = await fileHandle.queryPermission({ mode: "readwrite" });
+      if (perm !== "granted" && fileHandle.requestPermission) {
+        perm = await fileHandle.requestPermission({ mode: "readwrite" });
+      }
+      if (perm !== "granted") throw new Error("permission to write the file was not granted");
+    }
+    state.meta.lastSaved = new Date().toISOString();
+    state.meta.savedBy = initials;
+    var newText = buildFileText(pristineSource, state);
+
+    var writable = await fileHandle.createWritable();
+    await writable.write(newText);
+    await writable.close();
+
+    pristineSource = newText;
+    dirty = false;
+    showMessage("Saved. When you're done working, remember to check the file back in to NetDocuments.", "good");
+  } catch (e) {
+    showMessage(
+      "The save didn't work (" + e.name + ": " + e.message + ").\n\nYour changes are still on screen — open “How to use / trouble saving?” at the bottom and use “Save a copy (fallback)” so you don't lose them.",
+      "bad"
+    );
+  }
+  updateSaveBar();
+}
+
+function onSaveCopy() {
+  clearMessage();
+  var initials = requireInitials();
+  if (!initials) return;
+  try {
+    state.meta.lastSaved = new Date().toISOString();
+    state.meta.savedBy = initials;
+    var base = pristineSource !== null ? pristineSource : currentDomSource();
+    var newText = buildFileText(base, state);
+
+    var blob = new Blob([newText], { type: "text/html" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "ProjectTracker.html";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 5000);
+
+    dirty = false;
+    showMessage(
+      "A copy with your changes was downloaded (usually to your Downloads folder, named ProjectTracker.html).\n\nThat downloaded copy is now the current one — check IT back in to NetDocuments, not the file you have open.",
+      "good"
+    );
+  } catch (e) {
+    showMessage("Saving a copy didn't work (" + e.name + ": " + e.message + "). Please tell the person who set this up.", "bad");
+  }
+  updateSaveBar();
+}
+
+/* =====================================================================
+   UI RENDERING
+   ===================================================================== */
+
+var appEl = document.getElementById("app");
+
+// DOM builder: attrs handled as properties where it matters (value,
+// checked) so re-renders reflect current state; children are strings
+// (textContent — user data is never injected as HTML) or nodes.
+function el(tag, attrs) {
+  var node = document.createElement(tag);
+  if (attrs) {
+    for (var k in attrs) {
+      // null/undefined means "attribute absent" — setAttribute would
+      // stringify null to "null", which for boolean attributes like
+      // "selected" counts as present.
+      if (attrs[k] === null || attrs[k] === undefined) continue;
+      if (k === "class") node.className = attrs[k];
+      else if (k === "value") node.value = attrs[k];
+      else if (k === "checked") node.checked = attrs[k];
+      else if (k.slice(0, 2) === "on") node.addEventListener(k.slice(2), attrs[k]);
+      else node.setAttribute(k, attrs[k]);
+    }
+  }
+  for (var i = 2; i < arguments.length; i++) {
+    var c = arguments[i];
+    if (c === null || c === undefined) continue;
+    node.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+  }
+  return node;
+}
+
+function renderApp() {
+  appEl.textContent = "";
+  if (session.view.name === "detail") {
+    var p = getProject(session.view.projectId);
+    if (p) { renderDetail(p); updateSaveBar(); return; }
+    session.view = { name: "dashboard" };
+  }
+  renderDashboard();
+  updateSaveBar();
+}
+
+/* ---------- Dashboard ---------- */
+
+function renderDashboard() {
+  appEl.appendChild(renderDueSoon());
+
+  var visible = state.projects.filter(function (p) { return session.showClosed || !p.archived; });
+  visible.sort(projectComparator());
+
+  var closedCount = state.projects.filter(function (p) { return p.archived; }).length;
+
+  var controls = el("div", { class: "controls" },
+    el("button", { class: "primary", onclick: onNewProject }, "+ New project"),
+    el("label", null, "Sort by: ",
+      el("select", {
+        onchange: function (e) { session.sort = e.target.value; renderApp(); }
+      },
+        el("option", { value: "deadline", selected: session.sort === "deadline" ? "" : null }, "Next deadline"),
+        el("option", { value: "status", selected: session.sort === "status" ? "" : null }, "Status"),
+        el("option", { value: "name", selected: session.sort === "name" ? "" : null }, "Name")
+      )
+    ),
+    el("label", null,
+      el("input", {
+        type: "checkbox", checked: session.showClosed,
+        onchange: function (e) { session.showClosed = e.target.checked; renderApp(); }
+      }),
+      " Show closed projects (" + closedCount + ")"
+    )
+  );
+
+  var card = el("section", { class: "card" },
+    el("h2", null, "Projects"),
+    controls
+  );
+
+  if (visible.length === 0) {
+    card.appendChild(el("p", { class: "empty" },
+      state.projects.length === 0
+        ? "No projects yet. Click “+ New project” to add the first one."
+        : "No open projects. Tick “Show closed projects” to see closed ones."));
+  } else {
+    var tbody = el("tbody");
+    visible.forEach(function (p) { tbody.appendChild(projectRow(p)); });
+    card.appendChild(el("table", null,
+      el("thead", null, el("tr", null,
+        el("th", null, "Project"),
+        el("th", null, "Matter #"),
+        el("th", null, "Status"),
+        el("th", null, "Next deadline"),
+        el("th", null, "Current posture")
+      )),
+      tbody
+    ));
+  }
+  appEl.appendChild(card);
+}
+
+function projectComparator() {
+  if (session.sort === "name") {
+    return function (a, b) { return (a.name || "").localeCompare(b.name || ""); };
+  }
+  if (session.sort === "status") {
+    return function (a, b) {
+      var d = (STATUS_ORDER[a.status] || 0) - (STATUS_ORDER[b.status] || 0);
+      return d !== 0 ? d : (a.name || "").localeCompare(b.name || "");
+    };
+  }
+  // "deadline": most urgent first — any deadline (overdue counts as most
+  // urgent) sorts by earliest date; projects with no dated deadlines last.
+  return function (a, b) {
+    var ka = earliestDeadlineKey(a), kb = earliestDeadlineKey(b);
+    return ka < kb ? -1 : ka > kb ? 1 : (a.name || "").localeCompare(b.name || "");
+  };
+}
+function earliestDeadlineKey(p) {
+  var min = "9999-99-99";
+  (p.deadlines || []).forEach(function (d) { if (d.date && d.date < min) min = d.date; });
+  return min;
+}
+
+function projectRow(p) {
+  var s = deadlineSummary(p);
+  var deadlineCell = el("td");
+  if (s.overdue) {
+    deadlineCell.appendChild(el("div", { class: "overdue" },
+      "Overdue: " + (s.overdue.label || "deadline") + " — " + formatDate(s.overdue.date)));
+  }
+  if (s.upcoming) {
+    deadlineCell.appendChild(el("div", null,
+      formatDate(s.upcoming.date) + " — " + (s.upcoming.label || "deadline"),
+      el("span", { class: "muted" }, " (" + whenPhrase(s.upcoming.date) + ")")));
+  }
+  if (!s.overdue && !s.upcoming) deadlineCell.appendChild(el("span", { class: "muted" }, "—"));
+
+  return el("tr", {
+    class: "project-row",
+    onclick: function () { session.view = { name: "detail", projectId: p.id }; clearMessage(); renderApp(); window.scrollTo(0, 0); }
+  },
+    el("td", null, el("strong", null, p.name || "(unnamed project)")),
+    el("td", null, p.matterNumber || ""),
+    el("td", null, el("span", { class: "badge status-" + p.status }, statusLabel(p.status))),
+    deadlineCell,
+    el("td", null, p.posture || "")
+  );
+}
+
+function renderDueSoon() {
+  var today = localToday();
+  var items = [];
+  state.projects.forEach(function (p) {
+    if (p.archived) return;
+    (p.deadlines || []).forEach(function (d) {
+      if (d.date && daysFromToday(d.date) <= DUE_SOON_DAYS) {
+        items.push({ date: d.date, kind: "Deadline", text: d.label || "deadline", project: p });
+      }
+    });
+    (p.tasks || []).forEach(function (t) {
+      if (!t.done && t.due && daysFromToday(t.due) <= DUE_SOON_DAYS) {
+        items.push({ date: t.due, kind: "Task", text: t.text || "task", project: p, assignee: t.assignee });
+      }
+    });
+  });
+  items.sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
+
+  var card = el("section", { class: "card" },
+    el("h2", null, "Due soon (next " + DUE_SOON_DAYS + " days, plus anything overdue)"));
+  if (items.length === 0) {
+    card.appendChild(el("p", { class: "empty" }, "Nothing due in the next " + DUE_SOON_DAYS + " days."));
+  } else {
+    var list = el("ul", { class: "soon-list" });
+    items.forEach(function (it) {
+      var overdue = it.date < today;
+      list.appendChild(el("li", null,
+        el("span", { class: "soon-when " + (overdue ? "overdue" : "") },
+          formatDate(it.date) + " (" + whenPhrase(it.date) + ")"),
+        " " + it.kind + ": " + it.text + (it.assignee ? " [" + it.assignee + "]" : "") + " — ",
+        el("a", {
+          href: "#",
+          onclick: function (e) { e.preventDefault(); session.view = { name: "detail", projectId: it.project.id }; clearMessage(); renderApp(); window.scrollTo(0, 0); }
+        }, it.project.name || "(unnamed project)")
+      ));
+    });
+    card.appendChild(list);
+  }
+  return card;
+}
+
+function onNewProject() {
+  var p = {
+    id: uuid(),
+    name: "",
+    matterNumber: "",
+    status: "active",
+    description: "",
+    posture: "",
+    deadlines: [],
+    tasks: [],
+    notes: [],
+    archived: false
+  };
+  state.projects.push(p);
+  markDirty();
+  session.view = { name: "detail", projectId: p.id };
+  renderApp();
+  var nameInput = document.getElementById("proj-name");
+  if (nameInput) nameInput.focus();
+}
+
+/* ---------- Project detail ---------- */
+
+// Text fields write straight into state on input (no re-render, so focus
+// and cursor position survive typing). Structural changes (add/remove
+// items, status change) re-render the view.
+function bindText(obj, key) {
+  return function (e) { obj[key] = e.target.value; markDirty(); };
+}
+
+function renderDetail(p) {
+  appEl.appendChild(el("div", { class: "back" },
+    el("button", { class: "subtle", onclick: function () { session.view = { name: "dashboard" }; clearMessage(); renderApp(); } },
+      "← All projects")));
+
+  // --- Basics ---
+  var statusSelect = el("select", {
+    onchange: function (e) {
+      p.status = e.target.value;
+      // Closing a project archives it (hidden from the dashboard by
+      // default but retained in the file); reopening un-archives.
+      p.archived = (p.status === "closed");
+      markDirty();
+      renderApp();
+    }
+  });
+  STATUSES.forEach(function (s) {
+    statusSelect.appendChild(el("option", { value: s.value, selected: p.status === s.value ? "" : null }, s.label));
+  });
+
+  appEl.appendChild(el("section", { class: "card" },
+    el("div", { class: "field-row" },
+      el("div", { class: "field", style: "flex:2" },
+        el("label", { for: "proj-name" }, "Project name"),
+        el("input", { id: "proj-name", type: "text", value: p.name, placeholder: "e.g. Groundwater Sustainability Plan Update", oninput: bindText(p, "name") })),
+      el("div", { class: "field" },
+        el("label", null, "Matter / reference #"),
+        el("input", { type: "text", value: p.matterNumber, oninput: bindText(p, "matterNumber") })),
+      el("div", { class: "field" },
+        el("label", null, "Status"),
+        statusSelect)
+    ),
+    el("div", { class: "field" },
+      el("label", null, "Current posture (one line: where things stand right now)"),
+      el("input", { type: "text", value: p.posture, placeholder: "e.g. Waiting on client comments to draft ordinance", oninput: bindText(p, "posture") })),
+    el("div", { class: "field" },
+      el("label", null, "Description"),
+      el("textarea", { value: p.description, oninput: bindText(p, "description") }))
+  ));
+
+  // --- Deadlines ---
+  var dlCard = el("section", { class: "card" }, el("h2", null, "Key dates & deadlines"));
+  if (p.deadlines.length === 0) dlCard.appendChild(el("p", { class: "empty" }, "No deadlines yet."));
+  p.deadlines.forEach(function (d, i) {
+    dlCard.appendChild(el("div", { class: "item-row" },
+      el("input", { type: "text", value: d.label, placeholder: "What is due", oninput: bindText(d, "label") }),
+      el("input", {
+        type: "date", value: d.date || "",
+        onchange: function (e) { d.date = e.target.value || null; markDirty(); }
+      }),
+      el("button", {
+        class: "remove", title: "Remove this deadline", type: "button",
+        onclick: function () { p.deadlines.splice(i, 1); markDirty(); renderApp(); }
+      }, "✕")
+    ));
+  });
+  dlCard.appendChild(el("button", {
+    type: "button",
+    onclick: function () { p.deadlines.push({ id: uuid(), label: "", date: null }); markDirty(); renderApp(); }
+  }, "+ Add deadline"));
+  appEl.appendChild(dlCard);
+
+  // --- Tasks ---
+  var taskCard = el("section", { class: "card" }, el("h2", null, "Tasks"));
+  if (p.tasks.length === 0) taskCard.appendChild(el("p", { class: "empty" }, "No tasks yet."));
+  p.tasks.forEach(function (t, i) {
+    taskCard.appendChild(el("div", { class: "item-row" + (t.done ? " done" : "") },
+      el("input", {
+        type: "checkbox", checked: t.done, title: "Done?",
+        onchange: function (e) { t.done = e.target.checked; markDirty(); renderApp(); }
+      }),
+      el("input", { type: "text", value: t.text, placeholder: "What needs doing", oninput: bindText(t, "text") }),
+      el("input", {
+        type: "date", value: t.due || "", title: "Due date (optional)",
+        onchange: function (e) { t.due = e.target.value || null; markDirty(); }
+      }),
+      el("input", {
+        class: "assignee", type: "text", maxlength: "4", value: t.assignee || "", placeholder: "who",
+        title: "Assignee initials (optional)",
+        oninput: function (e) { t.assignee = e.target.value.trim().toUpperCase() || null; markDirty(); }
+      }),
+      el("button", {
+        class: "remove", title: "Remove this task", type: "button",
+        onclick: function () { p.tasks.splice(i, 1); markDirty(); renderApp(); }
+      }, "✕")
+    ));
+  });
+  taskCard.appendChild(el("button", {
+    type: "button",
+    onclick: function () { p.tasks.push({ id: uuid(), text: "", done: false, due: null, assignee: null }); markDirty(); renderApp(); }
+  }, "+ Add task"));
+  appEl.appendChild(taskCard);
+
+  // --- Notes ---
+  var composer = el("textarea", { placeholder: "Type a note about this project…" });
+  var noteCard = el("section", { class: "card" },
+    el("h2", null, "Notes"),
+    el("div", { class: "note-composer" },
+      composer,
+      el("div", null, el("button", {
+        type: "button",
+        onclick: function () {
+          var text = composer.value.trim();
+          if (!text) return;
+          var initials = requireInitials();
+          if (!initials) return;
+          p.notes.unshift({ id: uuid(), timestamp: new Date().toISOString(), author: initials, text: text });
+          markDirty();
+          renderApp();
+        }
+      }, "Add note"))
+    )
+  );
+  if (p.notes.length === 0) {
+    noteCard.appendChild(el("p", { class: "empty" }, "No notes yet."));
+  } else {
+    p.notes.forEach(function (n, i) {
+      noteCard.appendChild(el("div", { class: "note" },
+        el("div", { class: "note-head" },
+          el("span", null, new Date(n.timestamp).toLocaleString() + " — " + n.author),
+          el("button", {
+            class: "remove", title: "Delete this note", type: "button",
+            onclick: function () {
+              if (confirm("Delete this note? This cannot be undone.")) {
+                p.notes.splice(i, 1); markDirty(); renderApp();
+              }
+            }
+          }, "✕")),
+        el("div", { class: "note-body" }, n.text)
+      ));
+    });
+  }
+  appEl.appendChild(noteCard);
+
+  // --- Danger zone ---
+  appEl.appendChild(el("section", { class: "card" },
+    el("button", {
+      class: "danger-link", type: "button",
+      onclick: function () {
+        var label = p.name || "(unnamed project)";
+        if (confirm("Delete “" + label + "” and everything in it (tasks, deadlines, notes)? This cannot be undone.\n\nIf the project is simply finished, set its status to Closed instead — that keeps the history.")) {
+          state.projects = state.projects.filter(function (x) { return x.id !== p.id; });
+          markDirty();
+          session.view = { name: "dashboard" };
+          renderApp();
+        }
+      }
+    }, "Delete this project…")
+  ));
+}
+
+/* =====================================================================
+   INIT
+   ===================================================================== */
+
+(function init() {
+  try {
+    state = readIsland();
+  } catch (e) {
+    state = { schemaVersion: 1, meta: { lastSaved: null, savedBy: null }, projects: [] };
+    showMessage(
+      "The saved data inside this file could not be read — the file may be damaged. Do NOT save over it. Close without saving and check out an earlier version from NetDocuments, then tell the person who set this up.",
+      "bad"
+    );
+  }
+
+  if (!escapingSelfTest()) {
+    showMessage("Something is wrong with this file's save mechanism (internal safety check failed). Do not save — tell the person who set this up.", "bad");
+  }
+
+  document.getElementById("btn-connect").addEventListener("click", onConnect);
+  document.getElementById("btn-save").addEventListener("click", onSave);
+  document.getElementById("btn-save-copy").addEventListener("click", onSaveCopy);
+  document.getElementById("initials").addEventListener("input", function (e) {
+    session.initials = e.target.value;
+  });
+
+  // Ctrl+S / Cmd+S saves instead of opening the browser's save dialog.
+  window.addEventListener("keydown", function (e) {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+      e.preventDefault();
+      onSave();
+    }
+  });
+
+  window.addEventListener("beforeunload", function (e) {
+    if (dirty) {
+      e.preventDefault();
+      e.returnValue = "";
+    }
+  });
+
+  renderApp();
+})();
+</script>
+</body>
+</html>
