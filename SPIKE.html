@@ -361,6 +361,21 @@ function renderDiagnostics() {
   diagLine(list, escapingSelfTest(),
     "Save-safety self-test: text containing “</" + "script>” is escaped correctly and cannot corrupt the file.");
 
+  // The file:// URL reveals which on-disk copy the browser is actually
+  // editing — an ndOffice echo folder, a temp/cache copy, or Downloads.
+  // Needed to explain why the NetDocuments click-to-open flow loses edits,
+  // and to build a "wrong copy" warning heuristic in Phase 1.
+  var locLi = diagLine(list, null, "This page was opened from: ");
+  var locSpan = document.createElement("span");
+  locSpan.className = "ua";
+  try {
+    locSpan.textContent = decodeURIComponent(location.href);
+  } catch (e) {
+    locSpan.textContent = location.href;
+  }
+  locLi.appendChild(locSpan);
+  locLi.appendChild(document.createTextNode(" — write this path down; it identifies which copy of the file is being edited."));
+
   var uaLi = diagLine(list, null, "Browser: ");
   var uaSpan = document.createElement("span");
   uaSpan.className = "ua";
